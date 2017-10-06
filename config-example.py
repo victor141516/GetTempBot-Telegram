@@ -2,4 +2,11 @@ BOT_NAME = "GetTempBot"
 GOOGLE_URL_SHORTEN_API = ""
 API_TOKEN = ""
 WEBHOOK_URL = "https://get-temp-bot.herokuapp.com"
+CHANNEL_REPLY_ID = ""
 POLLING = False
+
+
+CLIENT_API_ID = 
+CLIENT_API_HASH = ""
+CLIENT_PHONE = ""
+CLIENT_2FA_PASSWORD = ""
