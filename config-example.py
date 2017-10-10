@@ -1,10 +1,12 @@
 BOT_NAME = "GetTempBot"
 GOOGLE_URL_SHORTEN_API = ""
 API_TOKEN = ""
-WEBHOOK_URL = "https://get-temp-bot.herokuapp.com"
-CHANNEL_REPLY_ID = ""
+WEBHOOK_URL = "https://your-heroku-host.herokuapp.com"
+CHANNEL_REPLY_ID = "-100XXXXXXXXXX"
+CHANNEL_REPLY_TELETHON_ID = XXXXXXXXXX
+CHANNEL_REPLY_TELETHON_HASH = -XXXXXXXXXXXXXXXXXX
 POLLING = False
-
+DB_URL = 'postgres://root@localhost:5432/GetTempBot'
 
 CLIENT_API_ID = 
 CLIENT_API_HASH = ""

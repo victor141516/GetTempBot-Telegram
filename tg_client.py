@@ -1,7 +1,7 @@
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.functions.messages import GetMessagesRequest
-from telethon.tl.types import (InputPeerChat, PeerChat)
+from telethon.tl.types import InputPeerChannel
+import threading
 from config import *
 
 client = TelegramClient('tg_client', CLIENT_API_ID, CLIENT_API_HASH)
@@ -14,13 +14,18 @@ if (not client.is_user_authorized()):
         client.sign_in(password=CLIENT_2FA_PASSWORD)
 
 
-def get_download_link(message_id):
-    chat = client.get_entity(PeerChat(-1*int(CHANNEL_REPLY_ID)))
-    messages = client.get_message_history(chat, limit=10)
-    message = None
-    for each in messages[1]:
-        if (each.id == message_id):
-            message = each
-            break
-    client.download_media(message)
+def get_file_stream(message_id):
+    peer = InputPeerChannel(CHANNEL_REPLY_TELETHON_ID, CHANNEL_REPLY_TELETHON_HASH)
+    message = client.get_message_history(peer, offset_id=message_id+1, limit=1)[1][0]
+
+    stream = BytesIO()
+    thread = threading.Thread(target=client.download_media, args=(message,), kwargs={'file': stream})
+    thread.daemon = True
+    thread.start()
+    pos = 0
+    while (thread.is_alive()):
+        stream.seek(pos)
+        r = stream.read()
+        pos += len(r)
+        yield r
 

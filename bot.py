@@ -1,10 +1,21 @@
-from flask import Flask, request, make_response
+from flask import (
+    Flask,
+    request,
+    make_response,
+    Response,
+    stream_with_context
+)
 import os
 import requests
 import telebot
 from telebot import types
-from config import *
 
+from config import *
+from DbHandler import DbHandler
+from security import *
+import tg_client
+
+db = DbHandler(DB_URL)
 server = Flask(__name__)
 bot = telebot.TeleBot(API_TOKEN)
 TELEGRAM_FILE_URL = "https://api.telegram.org/file/bot{token}/".format(token=API_TOKEN) + "{file_path}"
@@ -14,33 +25,22 @@ def google_url_shorten(url):
    r = requests.post(req_url, json={'longUrl': url}, headers={'content-type': 'application/json'})
    return r.json()['id']
 
-@bot.message_handler(content_types=['text', 'audio', 'document', 'photo', 'sticker', 'video', 'video_note', 'voice', 'location', 'contact', 'new_chat_members', 'left_chat_member', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo', 'group_chat_created', 'supergroup_chat_created', 'channel_chat_created', 'migrate_to_chat_id', 'migrate_from_chat_id', 'pinned_message'])
+@bot.message_handler(content_types=['document'])
 def get_link(message):
-    # Get message whatever type it is
-    document = message.__getattribute__(message.content_type)[1] if type(message.__getattribute__(message.content_type)) is type([]) else message.__getattribute__(message.content_type)
-
-    # Check if it has file_id (some types doesn't so them can't be linked)
-    if (not hasattr(document, 'file_id')):
-        bot.reply_to(message, "That content can't be linked")
-        return
-
-    # Try to generate the link. It may fail because file size mainly, but may there be other reasons
+    replied_msg = bot.forward_message(CHANNEL_REPLY_ID, message.chat.id, message.message_id)
+    hash_d = encode(replied_msg.message_id, API_TOKEN)
+    db.insert('links', {
+        'hash': hash_d,
+        'file_name': message.document.file_name,
+        'file_size': message.document.file_size,
+        'message_id': replied_msg.message_id
+    })
+    url = WEBHOOK_URL + '/d?id={hash}'.format(hash=hash_d)
     try:
-        url = TELEGRAM_FILE_URL.format(file_path=bot.get_file(document.file_id).file_path)
-    except Exception as e:
-        error_message = str(e).split('"description":"')[1].split('"')[0]
-        if (error_message == "Bad Request: file is too big"):
-            bot.reply_to(message, "This file is too big. Max file size is 20MB")
-        else:
-            bot.reply_to(message, error_message[0].upper() + error_message[1:])
-        return
-
-    # Try to short the link. May fail due Google policies
-    try:
-        bot.reply_to(message, google_url_shorten(url))
-    except Exception as e:
-        bot.reply_to(message, url)
-        return
+        url = google_url_shorten(url)
+    except Exception:
+        pass
+    return bot.reply_to(message, url)
 
 
 @server.route("/bot", methods=['POST'])
@@ -49,6 +49,24 @@ def getMessage():
         [telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
     return "!", 200
 
+@server.route("/d")
+def serve_file():
+    file_hash = request.args.get('id', default = 0, type = str)
+    link = db.select('links', 'hash = \'{hash}\''. format(hash=file_hash))
+
+    if (link == False or len(link) == 0):
+        return "File not found"
+    else:
+        link = link[0]
+
+    stream = stream_with_context(tg_client.get_file_stream(link['message_id']))
+    return Response(stream,
+        headers={
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': link['file_size'],
+            'Content-Disposition': 'attachment; filename="{file_name}"'.format(file_name=link['file_name'])
+            }
+    )
 
 @server.route("/")
 def webhook():
@@ -57,9 +75,9 @@ def webhook():
     bot.set_webhook(url=WEBHOOK_URL + "/bot")
     return "!", 200
 
+server.run(host="0.0.0.0", port=os.environ.get('PORT', 5000))
 
 if (POLLING):
     bot.remove_webhook()
     bot.polling()
-else:
-    server.run(host="0.0.0.0", port=os.environ.get('PORT', 5000))
+
