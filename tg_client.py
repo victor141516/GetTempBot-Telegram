@@ -1,3 +1,4 @@
+from io import BytesIO
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import InputPeerChannel

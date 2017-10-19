@@ -9,6 +9,7 @@ import os
 import requests
 import telebot
 from telebot import types
+import threading
 
 from config import *
 from DbHandler import DbHandler
@@ -17,7 +18,7 @@ import tg_client
 
 db = DbHandler(DB_URL)
 server = Flask(__name__)
-bot = telebot.TeleBot(API_TOKEN)
+bot = telebot.TeleBot(API_TOKEN, threaded=True)
 TELEGRAM_FILE_URL = "https://api.telegram.org/file/bot{token}/".format(token=API_TOKEN) + "{file_path}"
 
 def google_url_shorten(url):
@@ -75,9 +76,12 @@ def webhook():
     bot.set_webhook(url=WEBHOOK_URL + "/bot")
     return "!", 200
 
-server.run(host="0.0.0.0", port=os.environ.get('PORT', 5000))
 
 if (POLLING):
     bot.remove_webhook()
-    bot.polling()
+    thread = threading.Thread(target=bot.polling)
+    thread.daemon = True
+    thread.start()
 
+
+server.run(host="0.0.0.0", port=os.environ.get('PORT', 5000))
