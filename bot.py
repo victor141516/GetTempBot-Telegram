@@ -60,6 +60,14 @@ def get_link(message):
         return bot.reply_to(message, google_url_shorten(url))
 
 
+@bot.message_handler(commands=['help'])
+def help(message):
+    text = """You can send a file and you will receive a link to download from any browser.
+    You can also use /big and send multiple files, then use `/end filename` to get a link that will download your files appended. To split your files (Telegram supports up to 1,5GB) you can use this app for Android https://forum.xda-developers.com/showthread.php?t=2402650
+    You can use other apps to split (I accept suggestions @victor141516) or do it manually using a computer and any hex editor."""
+    return bot.send_message(message.chat.id, text, parse_mode='Markdown')
+
+
 @bot.message_handler(commands=['big'])
 def begin_big(message):
     big_files[message.chat.id] = []
@@ -68,7 +76,14 @@ def begin_big(message):
 
 @bot.message_handler(commands=['end'])
 def end_big(message):
+    file_name = message.text.split('/end')[1][1:]
+    if (file_name == ''):
+        return bot.reply_to(message, "Operation canelled")
+
     files = big_files[message.chat.id]
+    if (len(files) == 0):
+        return bot.reply_to(message, "You sent no files!")
+
     size = 0
     message_ids = []
 
@@ -79,7 +94,7 @@ def end_big(message):
     hash_d = encode(files[0]['message_id'], API_TOKEN)
     db.insert('links', {
         'hash': hash_d,
-        'file_name': message.text.split('/end')[1][1:],
+        'file_name': file_name,
         'file_size': size,
         'message_id': message_ids
     })
@@ -110,8 +125,7 @@ def serve_file():
                         'Content-Type': 'application/octet-stream',
                         'Content-Length': link['file_size'],
                         'Content-Disposition': 'attachment; filename="{file_name}"'.format(file_name=link['file_name'])
-                    }
-                    )
+                    })
 
 
 @server.route("/")
