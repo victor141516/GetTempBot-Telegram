@@ -11,7 +11,7 @@ class DbHandler(object):
         self.db = psycopg2.connect(self.db_name)
         cur = self.db.cursor()
         cur.execute(
-            'CREATE TABLE IF NOT EXISTS "links" (id SERIAL PRIMARY KEY, hash VARCHAR(100), file_name VARCHAR(200), file_size INTEGER, message_id INTEGER);')
+            'CREATE TABLE IF NOT EXISTS "links" (id SERIAL PRIMARY KEY, hash VARCHAR(100), file_name VARCHAR(200), file_size INTEGER, message_id INTEGER[]);')
 
     def __format_cursor__(self):
         self.cursor = self.db.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -22,7 +22,12 @@ class DbHandler(object):
 
     @staticmethod
     def _value_or_null(value):
-        return ("NULL" if value == "NULL" else ("'" + str(value) + "'"))
+        if (value == "NULL"):
+            return "NULL"
+        elif (type(value) is list):
+            return "'{" + str(value)[1:-1] + "}'"
+        else:
+            return "'" + str(value) + "'"
 
     def log(self, text, date=None, error=False, warning=False, info=False, debug=False):
         level = 0
@@ -96,7 +101,8 @@ class DbHandler(object):
             return 0
 
         if (exists):
-            sql = "UPDATE {0} SET {1} WHERE {2}".format(table, values_str, where_str)
+            sql = "UPDATE {0} SET {1} WHERE {2}".format(
+                table, values_str, where_str)
 
             try:
                 self.cursor.execute(sql)
@@ -113,7 +119,8 @@ class DbHandler(object):
             )
             for k in values])
 
-        sql = "INSERT INTO {0} ({1}) VALUES ({2})".format(table, columns_str, values2_str)
+        sql = "INSERT INTO {0} ({1}) VALUES ({2})".format(
+            table, columns_str, values2_str)
 
         try:
             # if (log):
@@ -128,7 +135,8 @@ class DbHandler(object):
 
     def select(self, table, where=None, log=True):
         if (where):
-            sql = "SELECT '{0}' as type, * FROM {1} WHERE ({2})".format(table, table, where)
+            sql = "SELECT '{0}' as type, * FROM {1} WHERE ({2})".format(
+                table, table, where)
             # if (log):
             #     self.log("SQL: " + sql, debug=True)
             return self._selectRaw(sql)
